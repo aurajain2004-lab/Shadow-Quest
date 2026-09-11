@@ -5,3 +5,4 @@ venv/
 build/
 dist/
 *.spec
+shadow_quest_high_score.txt

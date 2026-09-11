@@ -1,26 +1,23 @@
 # Shadow Quest
 
-Shadow Quest is a top-down 2D dungeon adventure built with Python 3 and Pygame. In Version 1.1.0, guide the hero through a dark, tile-based dungeon, fight chaser enemies, and reach the exit.
+Shadow Quest is a 2D top-down dungeon adventure developed using Python and Pygame. Explore three handcrafted dungeons, collect keys and items, fight multiple enemy types, defeat the final boss, and escape.
 
-## Version 1.1.0 — Combat Update
+## Version 2.0.0 — Final Release
 
-Implemented features:
+Features:
 
-- Main menu with Play, Instructions, and Quit buttons
-- Instructions screen
-- Smooth WASD and arrow-key movement
-- Grid-based dungeon with rooms, corridors, walls, torches, and an exit door
-- Rectangle collision with wall sliding
-- Chaser enemies with wall-aware movement, health bars, and contact damage
-- Directional attacks with cooldowns and hit feedback
-- Player health bar, enemy count, and defeated-enemy counter
-- Game Over screen with restart and main-menu actions
-- Gameplay HUD with health, enemy status, level, and objective
-- Pause, resume, restart, and main-menu actions
-- Level-complete screen with replay support
-- Mouse and keyboard menu navigation
-
-Weapons beyond the basic attack, items, power-ups, multiple levels, bosses, audio, score, and high scores are intentionally reserved for future releases.
+- Multiple dungeon levels with wall collision
+- Combat with directional attacks and hit feedback
+- Chaser and patrol enemy types
+- Final boss battle with a boss health bar
+- Keys and locked exits
+- Coins and scoring across all levels
+- Health potions
+- Temporary attack power-up
+- Local high-score persistence
+- Pause, restart, and Game Over screens
+- Final Victory screen with replay and main-menu actions
+- Resizable window and keyboard/mouse menu navigation
 
 ## Controls
 
@@ -44,12 +41,20 @@ Start the game with:
 python main.py
 ```
 
-The game opens at 1000 x 700 pixels.
+The game opens at 1000 x 700 pixels. A local `shadow_quest_high_score.txt` file is created beside the game when a run records a score.
+
+## Version History
+
+- v1.0.0 - Dungeon Foundation
+- v1.1.0 - Combat Update
+- v2.0.0 - Final Release
+
+The project is tracked using Git and GitHub with versioned releases.
 
 ## Project Structure
 
 ```text
-Catch-The-Objects/
+Shadow-Quest/
 ├── main.py          # Game states, dungeon, player, UI, and main loop
 ├── requirements.txt # Pygame dependency
 └── README.md        # Project documentation

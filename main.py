@@ -1,4 +1,4 @@
-"""Shadow Quest 1.0.0: a small, extensible top-down dungeon adventure."""
+"""Shadow Quest 1.1.0: a small, extensible top-down dungeon adventure."""
 
 import sys
 from enum import Enum, auto
@@ -14,6 +14,11 @@ TILE_SIZE = 40
 FPS = 60
 PLAYER_SPEED = 220
 PLAYER_SIZE = 24
+PLAYER_MAX_HEALTH = 100
+PLAYER_ATTACK_RANGE = 72
+PLAYER_ATTACK_COOLDOWN = 0.35
+PLAYER_ATTACK_DAMAGE = 25
+CONTACT_DAMAGE_COOLDOWN = 0.75
 
 INK = (12, 13, 21)
 PANEL = (25, 26, 39)
@@ -30,6 +35,10 @@ PLAYER = (86, 167, 177)
 PLAYER_LIGHT = (174, 235, 218)
 EXIT = (121, 77, 54)
 EXIT_LIGHT = (245, 181, 90)
+ENEMY = (177, 73, 78)
+ENEMY_LIGHT = (246, 137, 111)
+HEALTH_GREEN = (92, 190, 115)
+HEALTH_EMPTY = (91, 43, 51)
 
 
 class GameState(Enum):
@@ -38,6 +47,7 @@ class GameState(Enum):
     PLAYING = auto()
     PAUSED = auto()
     LEVEL_COMPLETE = auto()
+    GAME_OVER = auto()
 
 
 class Button:
@@ -150,6 +160,12 @@ class Player:
         self.start_position = pygame.Vector2(2.5 * TILE_SIZE, HUD_HEIGHT + 2.5 * TILE_SIZE)
         self.position = self.start_position.copy()
         self.direction = pygame.Vector2(0, 1)
+        self.max_health = PLAYER_MAX_HEALTH
+        self.health = self.max_health
+        self.damage_cooldown = 0.0
+        self.attack_cooldown = 0.0
+        self.attack_effect_timer = 0.0
+        self.attack_direction = self.direction.copy()
 
     @property
     def rect(self):
@@ -160,8 +176,19 @@ class Player:
     def reset(self):
         self.position = self.start_position.copy()
         self.direction = pygame.Vector2(0, 1)
+        self.health = self.max_health
+        self.damage_cooldown = 0.0
+        self.attack_cooldown = 0.0
+        self.attack_effect_timer = 0.0
+
+    @property
+    def alive(self):
+        return self.health > 0
 
     def update(self, delta_time):
+        self.damage_cooldown = max(0.0, self.damage_cooldown - delta_time)
+        self.attack_cooldown = max(0.0, self.attack_cooldown - delta_time)
+        self.attack_effect_timer = max(0.0, self.attack_effect_timer - delta_time)
         keys = pygame.key.get_pressed()
         movement = pygame.Vector2(
             int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_LEFT]),
@@ -172,6 +199,99 @@ class Player:
             self.direction = movement
             self._move_axis(movement.x * PLAYER_SPEED * delta_time, True)
             self._move_axis(movement.y * PLAYER_SPEED * delta_time, False)
+
+    def attack(self, enemies):
+        if self.attack_cooldown > 0 or not self.alive:
+            return
+        self.attack_cooldown = PLAYER_ATTACK_COOLDOWN
+        self.attack_effect_timer = 0.14
+        self.attack_direction = self.direction.copy()
+        attack_center = self.position + self.attack_direction * PLAYER_ATTACK_RANGE
+        for enemy in enemies:
+            if enemy.alive and enemy.position.distance_to(attack_center) <= enemy.radius + 24:
+                enemy.take_damage(PLAYER_ATTACK_DAMAGE)
+
+    def take_damage(self, amount):
+        if self.damage_cooldown > 0 or not self.alive:
+            return
+        self.health = max(0, self.health - amount)
+        self.damage_cooldown = CONTACT_DAMAGE_COOLDOWN
+
+    def _move_axis(self, amount, horizontal):
+        if horizontal:
+            self.position.x += amount
+        else:
+            self.position.y += amount
+        if self.dungeon.collides(self.rect):
+            if horizontal:
+                self.position.x -= amount
+            else:
+                self.position.y -= amount
+
+    def draw(self, surface):
+        if self.damage_cooldown > 0 and round(self.damage_cooldown * 14) % 2 == 0:
+            return
+        body = self.rect
+        pygame.draw.circle(surface, (20, 25, 34), body.center, PLAYER_SIZE // 2 + 4)
+        pygame.draw.circle(surface, PLAYER, body.center, PLAYER_SIZE // 2)
+        pygame.draw.circle(surface, PLAYER_LIGHT, body.center, 7)
+        tip = pygame.Vector2(body.center) + self.direction * 17
+        pygame.draw.line(surface, PLAYER_LIGHT, body.center, tip, 4)
+        pygame.draw.circle(surface, (235, 248, 211), (round(tip.x), round(tip.y)), 3)
+        if self.attack_effect_timer > 0:
+            attack_tip = self.position + self.attack_direction * (PLAYER_ATTACK_RANGE + 8)
+            pygame.draw.line(surface, GOLD_BRIGHT, self.position, attack_tip, 8)
+            pygame.draw.circle(surface, (255, 238, 164), (round(attack_tip.x), round(attack_tip.y)), 8, 2)
+
+
+class Enemy:
+    """Base class for enemies that live inside the dungeon."""
+
+    def __init__(self, dungeon, position, health, speed, contact_damage):
+        self.dungeon = dungeon
+        self.position = pygame.Vector2(position)
+        self.max_health = health
+        self.health = health
+        self.speed = speed
+        self.contact_damage = contact_damage
+        self.radius = 14
+        self.hit_flash_timer = 0.0
+
+    @property
+    def alive(self):
+        return self.health > 0
+
+    @property
+    def rect(self):
+        return pygame.Rect(round(self.position.x - self.radius),
+                           round(self.position.y - self.radius),
+                           self.radius * 2, self.radius * 2)
+
+    def take_damage(self, amount):
+        self.health = max(0, self.health - amount)
+        self.hit_flash_timer = 0.12
+
+    def update(self, delta_time, player):
+        self.hit_flash_timer = max(0.0, self.hit_flash_timer - delta_time)
+
+    def draw(self, surface):
+        pass
+
+
+class ChaserEnemy(Enemy):
+    def __init__(self, dungeon, position, health=75, speed=78, contact_damage=18):
+        super().__init__(dungeon, position, health, speed, contact_damage)
+
+    def update(self, delta_time, player):
+        super().update(delta_time, player)
+        if not self.alive or not player.alive:
+            return
+        direction = player.position - self.position
+        if direction.length_squared() == 0:
+            return
+        direction = direction.normalize()
+        self._move_axis(direction.x * self.speed * delta_time, True)
+        self._move_axis(direction.y * self.speed * delta_time, False)
 
     def _move_axis(self, amount, horizontal):
         if horizontal:
@@ -186,12 +306,16 @@ class Player:
 
     def draw(self, surface):
         body = self.rect
-        pygame.draw.circle(surface, (20, 25, 34), body.center, PLAYER_SIZE // 2 + 4)
-        pygame.draw.circle(surface, PLAYER, body.center, PLAYER_SIZE // 2)
-        pygame.draw.circle(surface, PLAYER_LIGHT, body.center, 7)
-        tip = pygame.Vector2(body.center) + self.direction * 17
-        pygame.draw.line(surface, PLAYER_LIGHT, body.center, tip, 4)
-        pygame.draw.circle(surface, (235, 248, 211), (round(tip.x), round(tip.y)), 3)
+        color = TEXT if self.hit_flash_timer > 0 else ENEMY
+        pygame.draw.circle(surface, (37, 19, 28), body.center, self.radius + 4)
+        pygame.draw.circle(surface, color, body.center, self.radius)
+        pygame.draw.circle(surface, ENEMY_LIGHT, (body.centerx - 5, body.centery - 3), 3)
+        pygame.draw.circle(surface, ENEMY_LIGHT, (body.centerx + 5, body.centery - 3), 3)
+        bar = pygame.Rect(body.left - 6, body.top - 12, self.radius * 2 + 12, 5)
+        pygame.draw.rect(surface, HEALTH_EMPTY, bar, border_radius=2)
+        health_width = round(bar.width * self.health / self.max_health)
+        if health_width:
+            pygame.draw.rect(surface, HEALTH_GREEN, (bar.left, bar.top, health_width, bar.height), border_radius=2)
 
 
 class Game:
@@ -222,6 +346,7 @@ class Game:
         self.pause_buttons = []
         self.instruction_buttons = []
         self.complete_buttons = []
+        self.game_over_buttons = []
         self._build_buttons()
         self.new_level()
 
@@ -244,10 +369,23 @@ class Game:
             Button("MAIN MENU", (center_x, 425, 250, 54), self.show_menu, self.button_font),
             Button("PLAY AGAIN", (center_x, 495, 250, 54), self.start_game, self.button_font),
         ]
+        self.game_over_buttons = [
+            Button("RESTART", (center_x, 425, 250, 54), self.start_game, self.button_font),
+            Button("MAIN MENU", (center_x, 495, 250, 54), self.show_menu, self.button_font),
+        ]
 
     def new_level(self):
         self.dungeon = Dungeon()
         self.player = Player(self.dungeon)
+        spawn_positions = (
+            (3.5 * TILE_SIZE, HUD_HEIGHT + 4.5 * TILE_SIZE),
+            (10.5 * TILE_SIZE, HUD_HEIGHT + 4.5 * TILE_SIZE),
+            (18.5 * TILE_SIZE, HUD_HEIGHT + 4.5 * TILE_SIZE),
+            (3.5 * TILE_SIZE, HUD_HEIGHT + 11.5 * TILE_SIZE),
+            (15.5 * TILE_SIZE, HUD_HEIGHT + 14.5 * TILE_SIZE),
+        )
+        self.enemies = [ChaserEnemy(self.dungeon, position) for position in spawn_positions]
+        self.enemies_defeated = 0
 
     def start_game(self):
         self.new_level()
@@ -273,7 +411,17 @@ class Game:
             self.handle_events()
             if self.state == GameState.PLAYING:
                 self.player.update(delta_time)
-                if self.player.rect.colliderect(self.dungeon.exit_rect):
+                for enemy in self.enemies:
+                    enemy.update(delta_time, self.player)
+                    if enemy.alive and enemy.rect.colliderect(self.player.rect):
+                        self.player.take_damage(enemy.contact_damage)
+                defeated = [enemy for enemy in self.enemies if not enemy.alive]
+                if defeated:
+                    self.enemies_defeated += len(defeated)
+                    self.enemies = [enemy for enemy in self.enemies if enemy.alive]
+                if not self.player.alive:
+                    self.state = GameState.GAME_OVER
+                elif self.player.rect.colliderect(self.dungeon.exit_rect):
                     self.state = GameState.LEVEL_COMPLETE
             self.draw()
         pygame.quit()
@@ -322,9 +470,12 @@ class Game:
     def handle_key(self, key, button_count):
         if self.state == GameState.PLAYING and key == pygame.K_ESCAPE:
             self.state = GameState.PAUSED
+        elif self.state == GameState.PLAYING and key == pygame.K_SPACE:
+            self.player.attack(self.enemies)
         elif self.state == GameState.PAUSED and key == pygame.K_ESCAPE:
             self.resume_game()
-        elif self.state in (GameState.MAIN_MENU, GameState.PAUSED, GameState.LEVEL_COMPLETE):
+        elif self.state in (GameState.MAIN_MENU, GameState.PAUSED,
+                            GameState.LEVEL_COMPLETE, GameState.GAME_OVER):
             self.menu_selection %= button_count
             if key in (pygame.K_UP, pygame.K_w):
                 self.menu_selection = (self.menu_selection - 1) % button_count
@@ -344,10 +495,13 @@ class Game:
             return self.pause_buttons
         if self.state == GameState.LEVEL_COMPLETE:
             return self.complete_buttons
+        if self.state == GameState.GAME_OVER:
+            return self.game_over_buttons
         return []
 
     def draw(self):
-        if self.state in (GameState.PLAYING, GameState.PAUSED, GameState.LEVEL_COMPLETE):
+        if self.state in (GameState.PLAYING, GameState.PAUSED,
+                  GameState.LEVEL_COMPLETE, GameState.GAME_OVER):
             self.draw_game()
         elif self.state == GameState.INSTRUCTIONS:
             self.draw_instructions()
@@ -375,26 +529,40 @@ class Game:
         pygame.draw.rect(self.screen, (80, 71, 89), panel, 2, border_radius=8)
         instructions = [
             ("WASD / Arrow Keys", "Move your hero through the dungeon"),
+            ("SPACE", "Attack enemies in the direction you face"),
             ("ESC", "Pause the game"),
             ("Objective", "Reach the glowing exit door"),
         ]
         for index, (label, description) in enumerate(instructions):
-            y = 250 + index * 72
+            y = 218 + index * 65
             self.screen.blit(self.body_font.render(label, True, GOLD_BRIGHT), (295, y))
             self.screen.blit(self.small_font.render(description, True, TEXT), (295, y + 28))
         self.instruction_buttons[0].draw(self.screen)
 
     def draw_game(self):
         self.dungeon.draw(self.screen)
+        for enemy in self.enemies:
+            enemy.draw(self.screen)
         self.player.draw(self.screen)
         pygame.draw.rect(self.screen, INK, (0, 0, SCREEN_WIDTH, HUD_HEIGHT))
         self.screen.blit(self.heading_font.render("SHADOW QUEST", True, GOLD_BRIGHT), (26, 18))
-        self.screen.blit(self.small_font.render("LEVEL: 1", True, TEXT), (675, 25))
-        self.screen.blit(self.small_font.render("OBJECTIVE: REACH THE EXIT", True, MUTED), (755, 25))
+        self.screen.blit(self.small_font.render(
+            f"HEALTH: {self.player.health} / {self.player.max_health}", True, TEXT), (300, 12))
+        health_bar = pygame.Rect(300, 39, 180, 13)
+        pygame.draw.rect(self.screen, HEALTH_EMPTY, health_bar, border_radius=4)
+        health_width = round(health_bar.width * self.player.health / self.player.max_health)
+        if health_width:
+            pygame.draw.rect(self.screen, HEALTH_GREEN,
+                             (health_bar.left, health_bar.top, health_width, health_bar.height), border_radius=4)
+        self.screen.blit(self.small_font.render(
+            f"ENEMIES: {len(self.enemies)}  DEFEATED: {self.enemies_defeated}", True, TEXT), (525, 12))
+        self.screen.blit(self.small_font.render("OBJECTIVE: REACH THE EXIT", True, MUTED), (525, 39))
         if self.state == GameState.PAUSED:
             self.draw_overlay("PAUSED", "The dungeon waits in silence.", self.pause_buttons)
         elif self.state == GameState.LEVEL_COMPLETE:
-            self.draw_overlay("LEVEL COMPLETE", "You found the way out.", self.complete_buttons)
+            self.draw_overlay("LEVEL COMPLETE", f"Enemies defeated: {self.enemies_defeated}", self.complete_buttons)
+        elif self.state == GameState.GAME_OVER:
+            self.draw_overlay("GAME OVER", f"Enemies defeated: {self.enemies_defeated}", self.game_over_buttons)
 
     def draw_overlay(self, heading, subtitle, buttons):
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)

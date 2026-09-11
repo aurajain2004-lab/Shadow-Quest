@@ -1,8 +1,8 @@
 # Shadow Quest
 
-Shadow Quest is a top-down 2D dungeon adventure built with Python 3 and Pygame. In Version 1.0.0, guide the hero through a dark, tile-based dungeon and reach the exit.
+Shadow Quest is a top-down 2D dungeon adventure built with Python 3 and Pygame. In Version 1.1.0, guide the hero through a dark, tile-based dungeon, fight chaser enemies, and reach the exit.
 
-## Version 1.0.0
+## Version 1.1.0 — Combat Update
 
 Implemented features:
 
@@ -11,16 +11,21 @@ Implemented features:
 - Smooth WASD and arrow-key movement
 - Grid-based dungeon with rooms, corridors, walls, torches, and an exit door
 - Rectangle collision with wall sliding
-- Gameplay HUD with level and objective
+- Chaser enemies with wall-aware movement, health bars, and contact damage
+- Directional attacks with cooldowns and hit feedback
+- Player health bar, enemy count, and defeated-enemy counter
+- Game Over screen with restart and main-menu actions
+- Gameplay HUD with health, enemy status, level, and objective
 - Pause, resume, restart, and main-menu actions
 - Level-complete screen with replay support
 - Mouse and keyboard menu navigation
 
-Combat, enemies, weapons, items, power-ups, multiple levels, bosses, audio, and high scores are intentionally reserved for future releases.
+Weapons beyond the basic attack, items, power-ups, multiple levels, bosses, audio, score, and high scores are intentionally reserved for future releases.
 
 ## Controls
 
 - `WASD` or Arrow Keys: Move
+- `SPACE`: Attack in the direction the hero is facing
 - `ESC`: Pause or resume during gameplay
 - Arrow Keys / `W` and `S`: Navigate menus
 - `Enter` or `Space`: Activate the selected menu button

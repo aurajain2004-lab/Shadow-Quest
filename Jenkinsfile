@@ -11,20 +11,20 @@ pipeline {
 
         stage('Build') {
             steps {
-                bat 'python --version'
-                bat 'python -m pip install -r requirements.txt'
+                sh 'python3 --version'
+                sh 'python3 -m pip install -r requirements.txt'
             }
         }
 
         stage('Test/Validate') {
             steps {
-                bat 'python -m py_compile main.py'
+                sh 'python3 -m py_compile main.py'
             }
         }
 
         stage('Docker Build') {
             steps {
-                bat 'docker build -t shadow-quest:ci .'
+                sh 'docker build -t shadow-quest:ci .'
             }
         }
 

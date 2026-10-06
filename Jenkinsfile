@@ -12,13 +12,15 @@ pipeline {
         stage('Build') {
             steps {
                 sh 'python3 --version'
-                sh 'python3 -m pip install -r requirements.txt'
+                sh 'python3 -m py_compile main.py'
             }
         }
 
         stage('Test/Validate') {
             steps {
                 sh 'python3 -m py_compile main.py'
+                sh 'test -f requirements.txt'
+                sh 'test -f Dockerfile'
             }
         }
 

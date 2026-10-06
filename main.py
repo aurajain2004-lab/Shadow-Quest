@@ -24,6 +24,7 @@ COIN_VALUE = 10
 POTION_HEAL = 25
 POWER_UP_DURATION = 8.0
 POWERED_ATTACK_DAMAGE = 50
+GAME_VERSION = "2.0.1"
 HIGH_SCORE_FILE = Path(__file__).with_name("shadow_quest_high_score.txt")
 
 INK = (12, 13, 21)
@@ -814,6 +815,7 @@ class Game:
         self.draw_background()
         self.draw_centered("SHADOW QUEST", 150, self.title_font, GOLD_BRIGHT)
         self.draw_centered("A Dungeon Adventure", 215, self.body_font, MUTED)
+        self.draw_centered(f"Version {GAME_VERSION}", 245, self.small_font, MUTED)
         pygame.draw.line(self.screen, GOLD, (390, 255), (610, 255), 2)
         self.draw_centered(f"HIGH SCORE: {self.high_score}", 285, self.small_font, TEXT)
         for index, button in enumerate(self.menu_buttons):
